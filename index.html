@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wind Turbine Digital Twin Dashboard</title>
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background: #1e293b; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        h1 { grid-column: span 2; text-align: center; color: #38bdf8; margin-bottom: 20px; }
+        label { display: block; margin-top: 10px; font-size: 14px; color: #94a3b8; }
+        input { width: 100%; padding: 8px; margin-top: 5px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 6px; }
+        button { background: #0284c7; color: white; border: none; padding: 10px 20px; margin-top: 15px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; }
+        button:hover { background: #0ea5e9; }
+        .result-box { margin-top: 15px; background: #0f172a; padding: 15px; border-radius: 6px; border-left: 4px solid #38bdf8; transition: all 0.3s ease; }
+        .viewer-container { grid-column: span 2; height: 450px; background: #1e293b; border-radius: 12px; position: relative; overflow: hidden; border: 2px solid #334155; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🌪️ Wind Turbine Digital Twin Control Panel</h1>
+
+    <!-- Left Card: Inputs & Analytics -->
+    <div class="card">
+        <h3>Live Telemetry Inputs</h3>
+        <label>Wind Speed (m/s):</label>
+        <input type="number" id="wind_speed" value="12.0">
+        
+        <label>Power Output (Watts):</label>
+        <input type="number" id="power_output" value="45000">
+        
+        <label>Vibration RMS:</label>
+        <input type="number" id="vibration_rms" value="0.8">
+        
+        <label>Temperature (°C):</label>
+        <input type="number" id="temperature_c" value="55.0">
+
+        <label>Mechanical Stress (MPa):</label>
+        <input type="number" id="stress_mpa" value="150.0">
+
+        <button onclick="fetchAnalytics()">Calculate & Predict</button>
+    </div>
+
+    <!-- Right Card: Output Results -->
+    <div class="card">
+        <h3>Real-Time Analytics & Predictions</h3>
+        <div class="result-box" id="output">
+            <p>Click "Calculate & Predict" to view telemetry results...</p>
+        </div>
+    </div>
+
+    <!-- 3D Procedural Turbine Viewer Container -->
+    <div class="viewer-container" id="viewer-box"></div>
+</div>
+
+<script>
+let rotationSpeed = 0.03; // Normal blade speed
+
+async function fetchAnalytics() {
+    const data = {
+        wind_speed: parseFloat(document.getElementById('wind_speed').value),
+        power_output: parseFloat(document.getElementById('power_output').value),
+        vibration_rms: parseFloat(document.getElementById('vibration_rms').value),
+        temperature_c: parseFloat(document.getElementById('temperature_c').value),
+        stress_mpa: parseFloat(document.getElementById('stress_mpa').value)
+    };
+
+    try {
+        let response = await fetch('http://127.0.0.1:8000/api/v1/predict-analytics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        let result = await response.json();
+        
+        let outputBox = document.getElementById('output');
+
+        if (result.emergency_trip) {
+            // Red Alert & Trip State
+            rotationSpeed = 0.0; // Turbine blades stop spinning!
+            outputBox.style.background = '#450a0a';
+            outputBox.style.borderLeft = '4px solid #ef4444';
+            outputBox.innerHTML = `
+                <p style="color: #fca5a5; font-size: 16px; font-weight: bold;">🚨 EMERGENCY TRIP ACTIVATED!</p>
+                <p><b>Status:</b> ${result.turbine_status}</p>
+                <p><b>Estimated RUL:</b> ${result.estimated_remaining_useful_life_hours} Hours</p>
+                <p style="color: #ef4444; margin-top: 10px;">⚠️ Turbine brakes applied. Rotation halted to prevent damage.</p>
+            `;
+        } else {
+            // Normal State
+            rotationSpeed = 0.03; // Turbine blades resume normal spinning
+            outputBox.style.background = '#0f172a';
+            outputBox.style.borderLeft = '4px solid #38bdf8';
+            outputBox.innerHTML = `
+                <p><b>Efficiency:</b> ${result.efficiency_percent}% (${result.turbine_status})</p>
+                <p><b>Wind Power:</b> ${result.wind_power_watts} W</p>
+                <p><b>Estimated RUL:</b> ⏳ ${result.estimated_remaining_useful_life_hours} Hours remaining</p>
+            `;
+        }
+    } catch (error) {
+        document.getElementById('output').innerHTML = `<p style="color: #ef4444;">Error connecting to backend server!</p>`;
+    }
+}
+
+// --- Three.js 3D Procedural Wind Turbine Setup ---
+const container = document.getElementById('viewer-box');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+
+renderer.setSize(container.clientWidth, container.clientHeight);
+container.appendChild(renderer.domElement);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+scene.add(ambientLight);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+directionalLight.position.set(10, 20, 15);
+scene.add(directionalLight);
+
+camera.position.set(0, 5, 12);
+
+// Create Turbine Group
+const turbineGroup = new THREE.Group();
+
+// 1. Tower
+const towerGeo = new THREE.CylinderGeometry(0.2, 0.5, 6, 16);
+const towerMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.3 });
+const tower = new THREE.Mesh(towerGeo, towerMat);
+tower.position.y = 3;
+turbineGroup.add(tower);
+
+// 2. Nacelle
+const nacelleGeo = new THREE.BoxGeometry(0.8, 0.8, 1.5);
+const nacelleMat = new THREE.MeshStandardMaterial({ color: 0x334155 });
+const nacelle = new THREE.Mesh(nacelleGeo, nacelleMat);
+nacelle.position.set(0, 6, 0);
+turbineGroup.add(nacelle);
+
+// 3. Rotating Blades Hub
+const rotorGroup = new THREE.Group();
+rotorGroup.position.set(0, 6, 0.8);
+
+const bladeMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2 });
+for (let i = 0; i < 3; i++) {
+    const bladeGeo = new THREE.BoxGeometry(0.2, 3, 0.05);
+    const blade = new THREE.Mesh(bladeGeo, bladeMat);
+    blade.position.y = 1.5;
+    
+    const pivot = new THREE.Group();
+    pivot.rotation.z = (i * 2 * Math.PI) / 3;
+    pivot.add(blade);
+    rotorGroup.add(pivot);
+}
+turbineGroup.add(rotorGroup);
+scene.add(turbineGroup);
+
+// Animation loop with dynamic shutdown control
+function animate() {
+    requestAnimationFrame(animate);
+    rotorGroup.rotation.z -= rotationSpeed; // Rotation speed adjusts based on emergency status
+    renderer.render(scene, camera);
+}
+animate();
+
+// Resize handler
+window.addEventListener('resize', () => {
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
+});
+</script>
+
+</body>
+</html>
