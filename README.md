@@ -25,3 +25,9 @@ An industrial IoT and predictive maintenance web application designed for real-t
 ```bash
 git clone [https://github.com/sagarayusha/wind-turbine-digital-twin.git](https://github.com/sagarayusha/wind-turbine-digital-twin.git)
 cd wind-turbine-digital-twin
+2. Start the FastAPI Backend
+Bash
+pip install fastapi uvicorn pydantic numpy scikit-learn
+python -m uvicorn main:app --reload
+3. Launch the Frontend Dashboard
+Open index.html using Live Server in VS Code.
